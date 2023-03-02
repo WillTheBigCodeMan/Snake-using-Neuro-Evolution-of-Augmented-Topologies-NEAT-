@@ -14,22 +14,40 @@ class population {
             }
         }
     }
-    cullAndBreed(){
-        let species = [[this.population[0]]];
-        for(let i = 1; i < this.population.length; i ++){
+    cullAndBreed() {
+        let species = [
+            [this.population[0]]
+        ];
+        for (let i = 1; i < this.population.length; i++) {
             let found = false;
-            for(let j = 0; j < species.length; j ++){
-                if(distanceOfTopologies(species[j][0], this.population[i]) <= 15){
+            for (let j = 0; j < species.length; j++) {
+                if (distanceOfTopologies(species[j][0], this.population[i]) <= 15) {
                     found = true;
                     species[j].push(this.population[i]);
                     break;
                 }
             }
-            if(!found){
-                species.push([this.population[i]]);    
+            if (!found) {
+                species.push([this.population[i]]);
             }
         }
-        console.log(species);
+        for (let i = 0; i < species.length; i++) {
+            species[i] = sortByFitness(species[i]);
+            for (let j = Math.floor(species[i].length / 2) + 1; j < species[i].length; j++) {
+                let index = Math.floor(Math.random() * species.length);
+                let secondIndex = Math.floor(Math.random() * Math.floor(species[index].length / 2) + 1);
+                if (secondIndex >= species[index].length) {
+                    secondIndex = species[index].length - 1;
+                }
+                species[i][j] = combineTopologies(species[i][Math.floor(Math.random() * Math.floor(species[i].length / 2) + 1)], species[index][secondIndex]);
+                species[i][j].mutate();
+                //console.log(species[i][j]);
+            }
+        }
+        console.log(species[0][0].fitness, species);
+        for (let i = 0; i < this.population.length; i++) {
+            this.population[i].fitness = 0;
+        }
     }
 }
 
@@ -95,6 +113,7 @@ class topology {
             for (let i = 0; i < this.population.genes.length; i++) {
                 if (this.population.genes[i][0] == this.nodes.length + 1 && this.population.genes[i][1] == store[1]) {
                     connectionNumber = this.population.genes[2] - 1;
+                    console.log("found")
                 }
             }
             if (connectionNumber < 0) {
@@ -114,11 +133,11 @@ class topology {
             }
             this.maxConnections += this.nodes.length;
             this.nodes.push(this.nodes.length + 2);
-            console.log("Node");
+            console.log(this.nodes.length);
         } else if (x < 0.45) {
             let choice = Math.floor(Math.random() * this.connections.length);
             this.connections[choice][2] += (Math.random() * 0.4) - 0.2;
-            console.log("Weight Mutation");
+            //console.log("Weight Mutation");
         } else if (x < 0.6) {
             if (this.connections.length == this.maxConnections) {
                 this.mutate(0);
@@ -159,7 +178,7 @@ class topology {
                     } else {
                         this.connections.push([choice1, choice2, Math.random() * 4 - 2, connectionNumber, true]);
                     }
-                    console.log("Connection", choice1, choice2);
+                    //console.log("Connection", choice1, choice2);
                 } else {
                     this.mutate(0.5);
                 }
@@ -167,36 +186,93 @@ class topology {
         } else if (x < 0.8) {
             let choice = Math.floor(Math.random() * this.connections.length);
             this.connections[choice][2] = (Math.random() * 4) - 2;
-            console.log("Weight Randomised");
+            //console.log("Weight Randomised");
         } else {
             let choice = Math.floor(Math.random() * this.connections.length);
             this.connections[choice][4] = !this.connections[choice][4];
-            console.log("Disabled/ Enabled");
+            //console.log("Disabled/ Enabled");
         }
     }
 }
 
-function distanceOfTopologies(t1,t2){
+function sortByFitness(arr) {
+    let isSorted = false;
+    while (!isSorted) {
+        isSorted = true;
+        for (let i = 0; i < arr.length - 1; i++) {
+            if (arr[i].fitness < arr[i + 1].fitness) {
+                isSorted = false;
+                const store = arr[i];
+                arr[i] = arr[i + 1];
+                arr[i + 1] = store;
+            }
+        }
+    }
+    return arr;
+}
+
+function distanceOfTopologies(t1, t2) {
     let distance = 0;
-    for(let i = 0; i < t1.connections.length; i ++){
+    distance += Math.abs((t1.nodes.length - t2.nodes.length) * 10);
+    for (let i = 0; i < t1.connections.length; i++) {
         let found = false;
-        for(let j = 0; j < t2.connections.length; j ++){
-            if(t1.connections[i][3] == t2.connections[j][3]) {
+        for (let j = 0; j < t2.connections.length; j++) {
+            if (t1.connections[i][3] == t2.connections[j][3]) {
                 found = true;
                 distance += Math.abs(t1.connections[i][2] - t2.connections[i][2]) * 0.1;
                 break;
             }
         }
-        if(!found){
-            distance += 5;    
+        if (!found) {
+            distance += 5;
         }
     }
-    return distance; 
+    return distance;
+}
+
+function combineTopologies(t1, t2) { // Assumes t1 is dominant parent
+    let newConnections = copyArray(t1.connections);
+    let max = newConnections[0][3];
+    for (let i = 1; i < newConnections.length; i++) {
+        if (newConnections[i][3] > max) {
+            max = newConnections[i][3];
+        }
+    }
+    for (let i = 0; i < t2.connections.length; i++) {
+        if (t2.connections[i][3] < max) {
+            let found = false;
+            for (let j = 0; j < newConnections.length; j++) {
+                if (newConnections[j][3] == t2.connections[i][3]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                for (let j = 0; j < newConnections.length; j++) {
+                    if (newConnections[j][2] == t2.connections[i][2]) {
+                        newConnections.splice(j, 0, t2.connections[i]);
+                    }
+                }
+            }
+        }
+    }
+    return new topology(newConnections, t1.ins, t1.outs, t1.population);
+}
+
+function copyArray(arr) {
+    let out = [];
+    for (let i = 0; i < arr.length; i++) {
+        out.push([]);
+        for (let j = 0; j < arr[i].length; j++) {
+            out[i].push(arr[i][j]);
+        }
+    }
+    return out;
 }
 
 const sigmoid = (n) => (1 / (1 + Math.pow(Math.E, -1 * n)));
 
-let snakeBrains = new population(4, 4, 20);
+let snakeBrains = new population(4, 4, 2000);
 
 let w = 12;
 let h = 12;
@@ -236,6 +312,7 @@ for (let i = 0; i < snakes.length; i++) {
     };
     directions[i] = [0, 0];
     maxMoves[i] = 100;
+    snakeBrains.population[i].mutate();
 }
 
 function dispSnake(s, c) {
@@ -308,9 +385,9 @@ function isSnakeDead(s) {
 }
 
 function validNewDirection(d1, d2) {
-    if((d1[0] + d1[1] == 0 && d2[0] == -1)){
+    if ((d1[0] + d1[1] == 0 && d2[0] == -1)) {
         return d1;
-    } else if (d1[0] + d1[1] == 0){
+    } else if (d1[0] + d1[1] == 0) {
         return d2;
     } else if ((d1[0] == 0 && d2[0] == 0) || (d1[1] == 0 && d2[1] == 0)) {
         return d1;
@@ -334,7 +411,7 @@ function updateSnakeAndApple(s, a, d, f) {
     }
 }
 
-function indexOfMax(arr){
+function indexOfMax(arr) {
     if (arr.length === 0) {
         return -1;
     }
@@ -362,8 +439,8 @@ function playGeneration() {
                 let output = snakeBrains.population[i].getOutput(inputs);
                 directions[i] = validNewDirection(directions[i], dirs[indexOfMax(output)]);
                 let result = updateSnakeAndApple(snakes[i], apples[i], directions[i], snakeBrains.population[i].fitness);
-                maxMoves[i] --;
-                if (result == false||maxMoves[i] == 0) {
+                maxMoves[i]--;
+                if (result == false || maxMoves[i] == 0) {
                     stillAlive[i] = false;
                     deadCount++;
                     snakes[i] = [{
@@ -388,7 +465,7 @@ function playGeneration() {
                 } else {
                     snakes[i] = result[0];
                     apples[i] = result[1];
-                    if(result[2] > snakeBrains.population[i].fitness){
+                    if (result[2] > snakeBrains.population[i].fitness) {
                         maxMoves[i] += 100;
                     }
                     snakeBrains.population[i].fitness = result[2];
@@ -399,9 +476,43 @@ function playGeneration() {
     console.log(snakeBrains);
 }
 
-playGeneration();
-gameCanvas.fillStyle = "rgba(0,0,0,1)";
-gameCanvas.fillRect(0, 0, 400, 400);
-snakeBrains.cullAndBreed();
-dispApple(apples[0], gameCanvas);
-dispSnake(snakes[0], gameCanvas);
+function advanceGeneration() {
+    playGeneration();
+    snakeBrains.cullAndBreed();
+}
+
+setInterval(function () {
+    let inputs = [snakes[0].x - apples[0].x, snakes[0].y - apples[0].y, directions[0][0], directions[0][1]];
+    let output = snakeBrains.population[0].getOutput(inputs);
+    directions[0] = validNewDirection(directions[0], dirs[indexOfMax(output)]);
+    let result = updateSnakeAndApple(snakes[0], apples[0], directions[0], snakeBrains.population[0].fitness);
+    maxMoves[0]--;
+    if (result == false || maxMoves[0] == 0) {
+        snakes[0] = [{
+            x: w / 2,
+            y: h / 2
+        }, {
+            x: w / 2 - 1,
+            y: h / 2
+        }, {
+            x: w / 2 - 2,
+            y: h / 2
+        }, {
+            x: w / 2 - 3,
+            y: h / 2
+        }];
+        apples[0] = {
+            x: w / 2 + 2,
+            y: h / 2
+        };
+        directions[0] = [0, 0];
+        maxMoves[0] = 100;
+    } else {
+        snakes[0] = result[0];
+        apples[0] = result[1];
+    }
+    gameCanvas.fillStyle = "rgba(0,0,0,1)";
+    gameCanvas.fillRect(0, 0, 400, 400);
+    dispApple(apples[0], gameCanvas);
+    dispSnake(snakes[0], gameCanvas);
+}, 100);
