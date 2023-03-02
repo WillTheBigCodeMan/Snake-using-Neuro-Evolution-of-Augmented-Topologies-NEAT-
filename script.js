@@ -15,7 +15,21 @@ class population {
         }
     }
     cullAndBreed(){
-
+        let species = [[this.population[0]]];
+        for(let i = 1; i < this.population.length; i ++){
+            let found = false;
+            for(let j = 0; j < species.length; j ++){
+                if(distanceOfTopologies(species[j][0], this.population[i]) <= 15){
+                    found = true;
+                    species[j].push(this.population[i]);
+                    break;
+                }
+            }
+            if(!found){
+                species.push([this.population[i]]);    
+            }
+        }
+        console.log(species);
     }
 }
 
@@ -163,7 +177,21 @@ class topology {
 }
 
 function distanceOfTopologies(t1,t2){
-    return 1; // MAKE THIS CODE ICL
+    let distance = 0;
+    for(let i = 0; i < t1.connections.length; i ++){
+        let found = false;
+        for(let j = 0; j < t2.connections.length; j ++){
+            if(t1.connections[i][3] == t2.connections[j][3]) {
+                found = true;
+                distance += Math.abs(t1.connections[i][2] - t2.connections[i][2]) * 0.1;
+                break;
+            }
+        }
+        if(!found){
+            distance += 5;    
+        }
+    }
+    return distance; 
 }
 
 const sigmoid = (n) => (1 / (1 + Math.pow(Math.E, -1 * n)));
@@ -330,7 +358,7 @@ function playGeneration() {
     while (deadCount < snakes.length) {
         for (let i = 0; i < snakes.length; i++) {
             if (stillAlive[i]) {
-                let inputs = [2, 1, 4, 5]; // MAKE THIS BIT BETTER ICL
+                let inputs = [snakes[i].x - apples[i].x, snakes[i].y - apples[i].y, directions[i][0], directions[i][1]]; // MAKE THIS BIT BETTER ICL
                 let output = snakeBrains.population[i].getOutput(inputs);
                 directions[i] = validNewDirection(directions[i], dirs[indexOfMax(output)]);
                 let result = updateSnakeAndApple(snakes[i], apples[i], directions[i], snakeBrains.population[i].fitness);
@@ -374,5 +402,6 @@ function playGeneration() {
 playGeneration();
 gameCanvas.fillStyle = "rgba(0,0,0,1)";
 gameCanvas.fillRect(0, 0, 400, 400);
+snakeBrains.cullAndBreed();
 dispApple(apples[0], gameCanvas);
 dispSnake(snakes[0], gameCanvas);
