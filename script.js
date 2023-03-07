@@ -9,19 +9,46 @@ class population {
         }
         for (let i = 0; i < number; i++) {
             this.population[i] = new topology(null, ins, outs, this, copyArray(nodes));
-            for (let j = 0; j < 10; j++) {
-                this.population[i].mutate(0.5);
+            for (let j = 0; j < (ins * outs) / 2; j++) {
+                this.population[i].mutate(2);
             }
         }
+        this.generationNumber = 0;
     }
     cullAndBreed() {
         let matingPool = [];
         let bestFitness = this.population[0].fitness;
-        for(let i = 1; i < this.population.length; i++){
-            if(this.population[i].fitness > bestFitness){
+        for (let i = 1; i < this.population.length; i++) {
+            if (this.population[i].fitness > bestFitness) {
                 bestFitness = this.population[i].fitness;
             }
         }
+        for (let i = 0; i < this.population.length; i++) {
+            for (let j = 0; j < 100 * (this.population[i].fitness / bestFitness); j++) {
+                matingPool.push(i);
+            }
+        }
+        let nextGeneration = new Array(this.population.length);
+        for (let i = 0; i < this.population.length; i++) {
+            if (i > Math.floor(this.population.length / 4)) {
+                let p1Index = Math.floor(Math.random() * matingPool.length);
+                let p2Index = Math.floor(Math.random() * matingPool.length);
+                if (this.population[matingPool[p1Index]].fitness > this.population[matingPool[p2Index]].fitness) {
+                    nextGeneration[i] = combineTopologies(this.population[matingPool[p1Index]], this.population[matingPool[p2Index]]);
+                } else {
+                    nextGeneration[i] = combineTopologies(this.population[matingPool[p2Index]], this.population[matingPool[p1Index]]);
+                }
+                nextGeneration[i].fitness = 0;
+                nextGeneration[i].mutate();
+            } else {
+                nextGeneration[i] = this.population[i];
+                nextGeneration[i].fitness = 0;
+                nextGeneration[i].mutate();
+            }
+        }
+        this.population = nextGeneration;
+        this.generationNumber++;
+        console.log(this.generationNumber);
     }
 }
 
@@ -83,7 +110,7 @@ class topology {
         if (n != null) {
             x = n;
         }
-        if (x < 0.15) {
+        if (x < 0.01) {
             let choice = Math.floor(Math.random() * this.connections.length);
             const store = this.connections[choice];
             let connectionNumber = -1;
@@ -109,10 +136,13 @@ class topology {
             }
             this.maxConnections += this.nodes.length;
             this.nodes.push(this.nodes.length + 1);
-        } else if (x < 0.45) {
-            let choice = Math.floor(Math.random() * this.connections.length);
-            this.connections[choice][2] += (Math.random() * 0.4) - 0.2;
-        } else if (x < 0.6) {
+        }
+        if (x < 0.8) {
+            for (let choice = 0; choice < this.connections.length; choice++) {
+                this.connections[choice][2] += (Math.random() * 0.4) - 0.2;
+            }
+        }
+        if (x < 0.05 || x == 2) {
             if (this.connections.length == this.maxConnections) {
                 this.mutate(0);
             } else {
@@ -153,13 +183,15 @@ class topology {
                         this.connections.push([choice1, choice2, Math.random() * 4 - 2, connectionNumber, true]);
                     }
                 } else {
-                    this.mutate(0.5);
+                    this.mutate(2);
                 }
             }
-        } else if (x < 0.8) {
+        }
+        if (x < 0.2) {
             let choice = Math.floor(Math.random() * this.connections.length);
             this.connections[choice][2] = (Math.random() * 4) - 2;
-        } else {
+        }
+        if (x < 0.1) {
             let choice = Math.floor(Math.random() * this.connections.length);
             this.connections[choice][4] = !this.connections[choice][4];
         }
@@ -253,8 +285,8 @@ const sigmoid = (n) => (1 / (1 + Math.pow(Math.E, -1 * n)));
 
 let snakeBrains = new population(24, 4, 2000);
 
-let w = 12;
-let h = 12;
+let w = 18;
+let h = 18;
 
 let wS = 400 / w;
 let hS = 400 / h;
@@ -266,7 +298,7 @@ let apples = new Array(snakes.length);
 let directions = new Array(snakes.length);
 let maxMoves = new Array(snakes.length);
 
-let overallBest = 0;
+let overallBest = -100;
 let bestIndex = 0;
 
 const dirs = [
@@ -295,9 +327,6 @@ for (let i = 0; i < snakes.length; i++) {
     };
     directions[i] = [0, 0];
     maxMoves[i] = 100;
-    for (let j = 0; j < 5; j++) {
-        snakeBrains.population[i].mutate();
-    }
 }
 
 console.log(snakeBrains);
@@ -469,6 +498,8 @@ function playGeneration() {
                 if (result == false || maxMoves[i] == 0) {
                     if (maxMoves[i] == 0) {
                         snakeBrains.population[i].fitness -= 2;
+                    } else {
+                        snakeBrains.population[i].fitness -= 3;
                     }
                     stillAlive[i] = false;
                     deadCount++;
@@ -503,6 +534,8 @@ function playGeneration() {
                 let difference = newDistanceToApple - currentDistanceToApple;
                 if (difference < 0) {
                     snakeBrains.population[i].fitness += 0.05;
+                } else {
+                    snakeBrains.population[i].fitness -= 0.01;
                 }
             }
         }
@@ -576,7 +609,7 @@ setInterval(function () {
     dispSnake(snakeDisp, gameCanvas);
 }, 100);
 
-setInterval(advanceGeneration, 500);
+setInterval(advanceGeneration, 3000);
 
 function drawNetwork(index) {
     const nCanvas = document.getElementById("network").getContext("2d");
@@ -591,27 +624,29 @@ function drawNetwork(index) {
         nCanvas.fillRect(360, (i + 2) * (400 / (4 + snakeBrains.population[index].outs)), 10, 10);
     }
     for (let i = 0; i < snakeBrains.population[index].connections.length; i++) {
-        nCanvas.strokeStyle = (snakeBrains.population[index].connections[i][2] > 0 ? "rgba(255,0,0," : "rgba(0,0,255,") + Math.abs(snakeBrains.population[index].connections[i][2] / 2).toString() + ")";
-        if (snakeBrains.population[index].connections[i][1] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
-            nCanvas.fillStyle = "purple";
-            nCanvas.fillRect(40 + (snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2, 10, 10);
-            if (snakeBrains.population[index].connections[i][0] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
+        if (snakeBrains.population[index].connections[i][4]) {
+            nCanvas.strokeStyle = (snakeBrains.population[index].connections[i][2] > 0 ? "rgba(255,0,0," : "rgba(0,0,255,") + Math.abs(snakeBrains.population[index].connections[i][2] / 2).toString() + ")";
+            if (snakeBrains.population[index].connections[i][1] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
+                nCanvas.fillStyle = "purple";
+                nCanvas.fillRect(40 + (snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2, 10, 10);
+                if (snakeBrains.population[index].connections[i][0] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
+                    nCanvas.moveTo(50 + 5 + (snakeBrains.population[index].connections[i][0] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
+                    nCanvas.lineTo(40 + 5 + (snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
+                    nCanvas.stroke();
+                } else {
+                    nCanvas.moveTo(30, 5 + (snakeBrains.population[index].connections[i][0] + 1) * (400 / (4 + snakeBrains.population[index].ins)));
+                    nCanvas.lineTo(40 + (5 + snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
+                    nCanvas.stroke();
+                }
+            } else if (snakeBrains.population[index].connections[i][0] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
                 nCanvas.moveTo(50 + 5 + (snakeBrains.population[index].connections[i][0] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
-                nCanvas.lineTo(40 + 5 + (snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
+                nCanvas.lineTo(360, 5 + (snakeBrains.population[index].connections[i][1] - snakeBrains.population[index].ins + 1) * (400 / (4 + snakeBrains.population[index].outs)));
                 nCanvas.stroke();
             } else {
                 nCanvas.moveTo(30, 5 + (snakeBrains.population[index].connections[i][0] + 1) * (400 / (4 + snakeBrains.population[index].ins)));
-                nCanvas.lineTo(40 + (5 + snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
+                nCanvas.lineTo(360, 5 + (snakeBrains.population[index].connections[i][1] - snakeBrains.population[index].ins + 1) * (400 / (4 + snakeBrains.population[index].outs)));
                 nCanvas.stroke();
             }
-        } else if (snakeBrains.population[index].connections[i][0] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
-            nCanvas.moveTo(50 + 5 + (snakeBrains.population[index].connections[i][0] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
-            nCanvas.lineTo(360, 5 + (snakeBrains.population[index].connections[i][1] - snakeBrains.population[index].ins + 1) * (400 / (4 + snakeBrains.population[index].outs)));
-            nCanvas.stroke();
-        } else {
-            nCanvas.moveTo(30, 5 + (snakeBrains.population[index].connections[i][0] + 1) * (400 / (4 + snakeBrains.population[index].ins)));
-            nCanvas.lineTo(360, 5 + (snakeBrains.population[index].connections[i][1] - snakeBrains.population[index].ins + 1) * (400 / (4 + snakeBrains.population[index].outs)));
-            nCanvas.stroke();
         }
     }
 }
