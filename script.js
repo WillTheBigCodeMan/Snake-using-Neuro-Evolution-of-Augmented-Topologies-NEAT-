@@ -14,14 +14,18 @@ class population {
             }
         }
         this.generationNumber = 0;
+        this.bestIndex = 0;
     }
     cullAndBreed() {
+        let total = 0;
         let matingPool = [];
         let bestFitness = this.population[0].fitness;
         for (let i = 1; i < this.population.length; i++) {
             if (this.population[i].fitness > bestFitness) {
                 bestFitness = this.population[i].fitness;
+                this.bestIndex = i;
             }
+            total += this.population[i].fitness;
         }
         for (let i = 0; i < this.population.length; i++) {
             for (let j = 0; j < 100 * (this.population[i].fitness / bestFitness); j++) {
@@ -48,7 +52,7 @@ class population {
         }
         this.population = nextGeneration;
         this.generationNumber++;
-        console.log(this.generationNumber);
+        console.log(this.generationNumber, bestFitness, total / this.population.length, this.bestIndex);
     }
 }
 
@@ -66,7 +70,7 @@ class topology {
             this.connections = _connections;
             for (let i = 0; i < _connections.length; i++) {
                 if (!this.nodes.includes(_connections[i][1])) {
-                    this.nodes.push(_connections[i][1]);
+                    this.nodes.push(this.nodes.length);
                     this.maxConnections += this.nodes.length - 1;
                 }
             }
@@ -110,7 +114,7 @@ class topology {
         if (n != null) {
             x = n;
         }
-        if (x < 0.01) {
+        if (x < 0.01 || x == 3) {
             let choice = Math.floor(Math.random() * this.connections.length);
             const store = this.connections[choice];
             let connectionNumber = -1;
@@ -144,14 +148,14 @@ class topology {
         }
         if (x < 0.05 || x == 2) {
             if (this.connections.length == this.maxConnections) {
-                this.mutate(0);
+                this.mutate(3);
             } else {
                 let choice1 = 1 + Math.floor(Math.random() * (this.nodes.length - 1));
-                while (this.nodes[choice1 - 1] == -1 || (choice1 > this.ins && choice1 <= this.ins + this.outs)) {
+                while ((choice1 > this.ins && choice1 <= this.ins + this.outs)) {
                     choice1 = 1 + Math.floor(Math.random() * (this.nodes.length - 1));
                 }
                 let choice2 = 1 + Math.floor(Math.random() * (this.nodes.length - choice1)) + choice1;
-                while (this.nodes[choice2 - 1] == -1 || choice2 <= this.ins) {
+                while (choice2 <= this.ins) {
                     choice2 = 1 + Math.floor(Math.random() * (this.nodes.length - choice1)) + choice1;
                 }
                 let alreadyPresent = false;
@@ -182,8 +186,6 @@ class topology {
                     } else {
                         this.connections.push([choice1, choice2, Math.random() * 4 - 2, connectionNumber, true]);
                     }
-                } else {
-                    this.mutate(2);
                 }
             }
         }
@@ -279,374 +281,116 @@ function copyArray(arr) {
     return out;
 }
 
-
-
 const sigmoid = (n) => (1 / (1 + Math.pow(Math.E, -1 * n)));
 
-let snakeBrains = new population(24, 4, 2000);
-
-let w = 18;
-let h = 18;
-
-let wS = 400 / w;
-let hS = 400 / h;
-
-const gameCanvas = document.getElementById("game").getContext("2d");
-
-let snakes = new Array(snakeBrains.population.length);
-let apples = new Array(snakes.length);
-let directions = new Array(snakes.length);
-let maxMoves = new Array(snakes.length);
-
-let overallBest = -100;
-let bestIndex = 0;
-
-const dirs = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1]
-];
-for (let i = 0; i < snakes.length; i++) {
-    snakes[i] = [{
-        x: w / 2,
-        y: h / 2
-    }, {
-        x: w / 2 - 1,
-        y: h / 2
-    }, {
-        x: w / 2 - 2,
-        y: h / 2
-    }, {
-        x: w / 2 - 3,
-        y: h / 2
-    }];
-    apples[i] = {
-        x: w / 2 + 2,
-        y: h / 2
-    };
-    directions[i] = [0, 0];
-    maxMoves[i] = 100;
-}
-
-console.log(snakeBrains);
-
-function dispSnake(s, c) {
-    for (let i = 0; i < s.length; i++) {
-        c.fillStyle = "lightGreen";
-        c.fillRect(s[i].x * wS, s[i].y * hS, wS, hS);
-        c.strokeStyle = "darkGreen";
-        c.strokeRect(s[i].x * wS, s[i].y * hS, wS, hS);
+function drawNetwork(t) {
+    let nCanvas = document.getElementById("network").getContext("2d");
+    nCanvas.fillStyle = "rgb(0,0,0,255)";
+    nCanvas.fillRect(0, 0, 400, 400);
+    for (let i = 0; i < t.ins; i++) {
+        nCanvas.fillStyle = "lightblue";
+        nCanvas.fillRect(20, (i + 2) * (400 / (4 + t.ins)), 10, 10);
     }
-}
-
-function dispApple(a, c) {
-    c.fillStyle = "red";
-    c.fillRect(a.x * wS, a.y * hS, wS, hS);
-    c.strokeStyle = "crimson";
-    c.strokeRect(a.x * wS, a.y * hS, wS, hS);
-}
-
-function moveSnake(s, d) {
-    if (!(d[0] == 0 && d[1] == 0)) {
-        for (let i = s.length - 1; i > 0; i--) {
-            s[i].x = s[i - 1].x;
-            s[i].y = s[i - 1].y;
+    for (let i = 0; i < t.outs; i++) {
+        nCanvas.fillStyle = "lightgreen";
+        nCanvas.fillRect(360, (i + 2) * (400 / (4 + t.outs)), 10, 10);
+    }
+    for (let i = 0; i < t.connections.length; i++) {
+        console.log(i, t.connections[i]);
+        if (t.connections[i][4]) {
+            nCanvas.strokeStyle = (t.connections[i][2] > 0 ? "rgba(255,0,0," : "rgba(0,0,255,") + Math.abs(t.connections[i][2] / 2).toString() + ")";
+        } else {
+            nCanvas.strokeStyle = "white";
         }
-        s[0].x += d[0];
-        s[0].y += d[1];
-    }
-    return s;
-}
-
-function checkApple(s, a) {
-    let didEat = false;
-    if (s[0].x == a.x && s[0].y == a.y) {
-        didEat = true;
-        s.push({
-            x: -1,
-            y: -1
-        });
-        while (true) {
-            a = {
-                x: Math.floor(Math.random() * w),
-                y: Math.floor(Math.random() * h)
-            };
-            let val = true;
-            for (let i = 0; i < s.length; i++) {
-                if (a.x == s[i].x && a.y == s[i].y) {
-                    val = false;
-                    break;
-                }
+        if (t.connections[i][1] > t.ins + t.outs) {
+            nCanvas.fillStyle = "purple";
+            nCanvas.fillRect(40 + (t.connections[i][1] - (t.ins + t.outs)) * 10, t.connections[i][3] * 2, 10, 10);
+            if (t.connections[i][0] > t.ins + t.outs) {
+                // nCanvas.moveTo(50 + (t.connections[i][0] - (t.ins + t.outs)) * 10, 5 + t.connections[i][3] * 2);
+                // nCanvas.lineTo(40 + (t.connections[i][1] - (t.ins + t.outs)) * 10, 5 + t.connections[i][3] * 2);
+                // nCanvas.stroke();
+                // console.log(i);
+            } else {
+                // nCanvas.moveTo(30, 5 + (t.connections[i][0] + 1) * (400 / (4 + t.ins)));
+                // nCanvas.lineTo(40 + (t.connections[i][1] - (t.ins + t.outs)) * 10, 5 + t.connections[i][3] * 2);
+                // nCanvas.stroke();
+                // console.log(i);
             }
-            if (val) {
-                break;
-            }
+        } else if (t.connections[i][0] > t.ins + t.outs) {
+            // nCanvas.moveTo(50 + (t.connections[i][0] - (t.ins + t.outs)) * 10, 5 + t.connections[i][3] * 2);
+            // nCanvas.lineTo(360, 5 + (t.connections[i][1] - t.ins + 1) * (400 / (4 + t.outs)));
+            // nCanvas.stroke();
+            // console.log(i);
+        } else {
+            nCanvas.moveTo(30, 5 + (t.connections[i][0] + 1) * (400 / (4 + t.ins)));
+            nCanvas.lineTo(360, 5 + (t.connections[i][1] - t.ins + 1) * (400 / (4 + t.outs)));
+            nCanvas.stroke();
         }
     }
-    return [s, a, didEat];
 }
 
-function isSnakeDead(s) {
-    if (s[0].x < 0 || s[0].x > w - 1 || s[0].y < 0 || s[0].y > h - 1) {
-        return true;
-    }
-    for (let i = 2; i < s.length; i++) {
-        if (s[0].x == s[i].x && s[0].y == s[i].y) {
-            return true;
-        }
-    }
-    return false;
+let pop = new population(2, 2, 500);
+
+let points = [];
+
+const lineFunc = (x) => 400 * ((Math.sin((x / 100) + 0.8) * 0.4) + 0.5);
+
+const ctx = document.getElementById("game").getContext("2d")
+
+ctx.fillStyle = "rgba(0,0,0,1)";
+ctx.fillRect(0, 0, 400, 400);
+
+for (let i = 0; i < 400; i++) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(i, lineFunc(i), 2, 2);
 }
 
-function validNewDirection(d1, d2) {
-    if ((d1[0] + d1[1] == 0 && d2[0] == -1)) {
-        return d1;
-    } else if (d1[0] + d1[1] == 0) {
-        return d2;
-    } else if ((d1[0] == 0 && d2[0] == 0) || (d1[1] == 0 && d2[1] == 0)) {
-        return d1;
-    } else {
-        return d2;
-    }
-}
-
-function updateSnakeAndApple(s, a, d, f) {
-    s = moveSnake(s, d);
-    let result = checkApple(s, a);
-    s = result[0];
-    a = result[1];
-    if (result[2]) {
-        f++;
-    }
-    if (isSnakeDead(s)) {
-        return false;
-    } else {
-        return [s, a, f];
-    }
-}
-
-function indexOfMax(arr) {
-    if (arr.length === 0) {
-        return -1;
-    }
-    var max = arr[0];
-    var maxIndex = 0;
-    for (var i = 1; i < arr.length; i++) {
-        if (arr[i] > max) {
-            maxIndex = i;
-            max = arr[i];
-        }
-    }
-    return maxIndex;
-}
-
-function playGeneration() {
-    let stillAlive = new Array(snakes.length);
-    for (let i = 0; i < stillAlive.length; i++) {
-        stillAlive[i] = true;
-    }
-    let deadCount = 0;
-    while (deadCount < snakes.length) {
-        for (let i = 0; i < snakes.length; i++) {
-            if (stillAlive[i]) {
-                let inputs = [w - snakes[i][0].x, snakes[i][0].x, h - snakes[i][0].y, snakes[i][0].y, Math.sqrt(((w - snakes[i][0].x) * (w - snakes[i][0].x)) + (snakes[i][0].y * snakes[i][0].y)), Math.sqrt((snakes[i][0].x * snakes[i][0].x) + (snakes[i][0].y * snakes[i][0].y)), Math.sqrt((snakes[i][0].x * snakes[i][0].x) + ((h - snakes[i][0].y) * (h - snakes[i][0].y))), Math.sqrt(((w - snakes[i][0].x) * (w - snakes[i][0].x)) + ((h - snakes[i][0].y) * (h - snakes[i][0].y)))];
-                inputs.push(apples[i].x - snakes[i][0].x, snakes[i][0].x - apples[i].x, apples[i].y - snakes[i][0].y, snakes[i][0].y - apples[i].y);
-                inputs.push(Math.sqrt(Math.pow(apples[i].x - snakes[i][0].x, 2) + Math.pow(apples[i].y - snakes[i][0].y, 2)), Math.sqrt(Math.pow(snakes[i][0].x - apples[i].x, 2) + Math.pow(apples[i].y - snakes[i][0].y, 2)), Math.sqrt(Math.pow(apples[i].x - snakes[i][0].x, 2) + Math.pow(snakes[i][0].y - apples[i].y, 2)), Math.sqrt(Math.pow(snakes[i][0].x - apples[i].x, 2) + Math.pow(snakes[i][0].y - apples[i].y, 2)));
-                inputs.push(0, 0, 0, 0, 0, 0, 0, 0);
-                for (let j = 1; j < h; j++) {
-                    for (let k = 2; k < snakes[i].length; k++) {
-                        if (inputs[16] != 0 && snakes[i][k].x == snakes[i][0].x + j && snakes[i][k].y == snakes[i][0].y) {
-                            inputs[16] = h;
-                        }
-                        if (inputs[17] != 0 && snakes[i][k].x == snakes[i][0].x - j && snakes[i][k].y == snakes[i][0].y) {
-                            inputs[17] = h;
-                        }
-                        if (inputs[18] != 0 && snakes[i][k].x == snakes[i][0].x && snakes[i][k].y == snakes[i][0].y + j) {
-                            inputs[18] = h;
-                        }
-                        if (inputs[19] != 0 && snakes[i][k].x == snakes[i][0].x && snakes[i][k].y == snakes[i][0].y - j) {
-                            inputs[19] = h;
-                        }
-                        if (inputs[20] != 0 && snakes[i][k].x == snakes[i][0].x + j && snakes[i][k].y == snakes[i][0].y - j) {
-                            inputs[20] = Math.sqrt(2 * h * h);
-                        }
-                        if (inputs[21] != 0 && snakes[i][k].x == snakes[i][0].x - j && snakes[i][k].y == snakes[i][0].y + j) {
-                            inputs[21] = Math.sqrt(2 * h * h);
-                        }
-                        if (inputs[22] != 0 && snakes[i][k].x == snakes[i][0].x + j && snakes[i][k].y == snakes[i][0].y + j) {
-                            inputs[22] = Math.sqrt(2 * h * h);
-                        }
-                        if (inputs[23] != 0 && snakes[i][k].x == snakes[i][0].x - j && snakes[i][k].y == snakes[i][0].y - j) {
-                            inputs[23] = Math.sqrt(2 * h * h);
-                        }
-                    }
-                }
-                let output = snakeBrains.population[i].getOutput(inputs);
-                const currentDistanceToApple = Math.sqrt(Math.pow(apples[i].x - snakes[i][0].x, 2) + Math.pow(apples[i].y - snakes[i][1].y, 2));
-                directions[i] = validNewDirection(directions[i], dirs[indexOfMax(output)]);
-                let result = updateSnakeAndApple(snakes[i], apples[i], directions[i], snakeBrains.population[i].fitness);
-                maxMoves[i]--;
-                if (directions[i][0] + directions[i][1] != 0) {
-                    snakeBrains.population[i].fitness += 0.01;
-                }
-                if (snakeBrains.population[i].fitness > overallBest) {
-                    overallBest = snakeBrains.population[i].fitness;
-                    bestIndex = i;
-                    console.log(overallBest);
-                }
-                if (result == false || maxMoves[i] == 0) {
-                    if (maxMoves[i] == 0) {
-                        snakeBrains.population[i].fitness -= 2;
-                    } else {
-                        snakeBrains.population[i].fitness -= 3;
-                    }
-                    stillAlive[i] = false;
-                    deadCount++;
-                    snakes[i] = [{
-                        x: w / 2,
-                        y: h / 2
-                    }, {
-                        x: w / 2 - 1,
-                        y: h / 2
-                    }, {
-                        x: w / 2 - 2,
-                        y: h / 2
-                    }, {
-                        x: w / 2 - 3,
-                        y: h / 2
-                    }];
-                    apples[i] = {
-                        x: w / 2 + 2,
-                        y: h / 2
-                    };
-                    directions[i] = [0, 0];
-                    maxMoves[i] = 100;
-                } else {
-                    snakes[i] = result[0];
-                    apples[i] = result[1];
-                    if (result[2] > snakeBrains.population[i].fitness) {
-                        maxMoves[i] += 100;
-                        snakeBrains.population[i].fitness++;
-                    }
-                }
-                const newDistanceToApple = Math.sqrt(Math.pow(apples[i].x - snakes[i][0].x, 2) + Math.pow(apples[i].y - snakes[i][1].y, 2));
-                let difference = newDistanceToApple - currentDistanceToApple;
-                if (difference < 0) {
-                    snakeBrains.population[i].fitness += 0.05;
-                } else {
-                    snakeBrains.population[i].fitness -= 0.01;
-                }
-            }
-        }
-    }
-    drawNetwork(bestIndex);
+for (let i = 0; i < 2000; i++) {
+    let x = Math.random() * 400;
+    let y = Math.random() * 400;
+    points.push({
+        x: x,
+        y: y,
+        type: y > lineFunc(x)
+    });
+    ctx.fillStyle = points[i].type ? "green" : "blue";
+    ctx.fillRect(x, y, 2, 2);
 }
 
 function advanceGeneration() {
-    playGeneration();
-    snakeBrains.cullAndBreed();
-}
-
-let directionDisp = [0, 0];
-let maxMovesDisp = 100;
-let appleDisp = {
-    x: w / 2 + 2,
-    y: h / 2
-};
-let snakeDisp = [{
-    x: w / 2,
-    y: h / 2
-}, {
-    x: w / 2 - 1,
-    y: h / 2
-}, {
-    x: w / 2 - 2,
-    y: h / 2
-}, {
-    x: w / 2 - 3,
-    y: h / 2
-}];
-
-setInterval(function () {
-    let inputs = [w - snakeDisp[0].x, snakeDisp[0].x, h - snakeDisp[0].y, snakeDisp[0].y, Math.sqrt(Math.pow(Math.max(0, w - snakeDisp[0].x), 2) + Math.pow(Math.max(0, snakeDisp[0].y), 2)), Math.sqrt(Math.pow(Math.max(0, snakeDisp[0].x), 2) + Math.pow(Math.max(0, snakeDisp[0].y), 2)), Math.sqrt(Math.pow(Math.max(0, snakeDisp[0].x), 2) + Math.pow(Math.max(0, (h - snakeDisp[0].y)), 2)), Math.sqrt(Math.pow(Math.max(0, (w - snakeDisp[0].x)), 2) + Math.pow(Math.max(0, (h - snakeDisp[0].y)), 2))];
-    inputs.push(appleDisp.x - snakeDisp[0].x, snakeDisp[0].x - appleDisp.x, appleDisp.y - snakeDisp[0].y, snakeDisp[0].y - appleDisp.y);
-    inputs.push(Math.sqrt(Math.pow(Math.max(appleDisp.x - snakeDisp[0].x, 0), 2) + Math.pow(Math.max(appleDisp.y - snakeDisp[0].y, 0), 2)), Math.sqrt(Math.pow(Math.max(snakeDisp[0].x - appleDisp.x, 0), 2) + Math.pow(Math.max(appleDisp.y - snakeDisp[0].y, 0), 2)), Math.sqrt(Math.pow(Math.max(appleDisp.x - snakeDisp[0].x, 0), 2) + Math.pow(Math.max(snakeDisp[0].y - appleDisp.y, 0), 2)), Math.sqrt(Math.pow(Math.max(snakeDisp[0].x - appleDisp.x, 0), 2) + Math.pow(Math.max(snakeDisp[0].y - appleDisp.y, 0), 2)));
-    for (let i = 0; i < inputs.length; i++) {
-        inputs[i] = Math.max(0, inputs[i]);
-    }
-    let output = snakeBrains.population[bestIndex].getOutput(inputs);
-    directionDisp = validNewDirection(directionDisp, dirs[indexOfMax(output)]);
-    let result = updateSnakeAndApple(snakeDisp, appleDisp, directionDisp, snakeBrains.population[bestIndex].fitness);
-    maxMovesDisp--;
-    if (result == false || maxMovesDisp == 0) {
-        snakeDisp = [{
-            x: w / 2,
-            y: h / 2
-        }, {
-            x: w / 2 - 1,
-            y: h / 2
-        }, {
-            x: w / 2 - 2,
-            y: h / 2
-        }, {
-            x: w / 2 - 3,
-            y: h / 2
-        }];
-        appleDisp = {
-            x: w / 2 + 2,
-            y: h / 2
-        };
-        directionDisp = [0, 0];
-        maxMovesDisp = 100;
-    } else {
-        snakeDisp = result[0];
-        appleDisp = result[1];
-    }
-    gameCanvas.fillStyle = "rgba(0,0,0,1)";
-    gameCanvas.fillRect(0, 0, 400, 400);
-    dispApple(appleDisp, gameCanvas);
-    dispSnake(snakeDisp, gameCanvas);
-}, 100);
-
-setInterval(advanceGeneration, 3000);
-
-function drawNetwork(index) {
-    const nCanvas = document.getElementById("network").getContext("2d");
-    nCanvas.fillStyle = "rgba(0.8,0.8,0.9,1)";
-    nCanvas.fillRect(0, 0, 400, 400);
-    for (let i = 0; i < snakeBrains.population[index].ins; i++) {
-        nCanvas.fillStyle = "lightblue";
-        nCanvas.fillRect(20, (i + 2) * (400 / (4 + snakeBrains.population[index].ins)), 10, 10);
-    }
-    for (let i = 0; i < snakeBrains.population[index].outs; i++) {
-        nCanvas.fillStyle = "lightgreen";
-        nCanvas.fillRect(360, (i + 2) * (400 / (4 + snakeBrains.population[index].outs)), 10, 10);
-    }
-    for (let i = 0; i < snakeBrains.population[index].connections.length; i++) {
-        if (snakeBrains.population[index].connections[i][4]) {
-            nCanvas.strokeStyle = (snakeBrains.population[index].connections[i][2] > 0 ? "rgba(255,0,0," : "rgba(0,0,255,") + Math.abs(snakeBrains.population[index].connections[i][2] / 2).toString() + ")";
-            if (snakeBrains.population[index].connections[i][1] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
-                nCanvas.fillStyle = "purple";
-                nCanvas.fillRect(40 + (snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2, 10, 10);
-                if (snakeBrains.population[index].connections[i][0] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
-                    nCanvas.moveTo(50 + 5 + (snakeBrains.population[index].connections[i][0] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
-                    nCanvas.lineTo(40 + 5 + (snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
-                    nCanvas.stroke();
-                } else {
-                    nCanvas.moveTo(30, 5 + (snakeBrains.population[index].connections[i][0] + 1) * (400 / (4 + snakeBrains.population[index].ins)));
-                    nCanvas.lineTo(40 + (5 + snakeBrains.population[index].connections[i][1] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
-                    nCanvas.stroke();
-                }
-            } else if (snakeBrains.population[index].connections[i][0] > snakeBrains.population[index].ins + snakeBrains.population[index].outs) {
-                nCanvas.moveTo(50 + 5 + (snakeBrains.population[index].connections[i][0] - (snakeBrains.population[index].ins + snakeBrains.population[index].outs)) * 10, snakeBrains.population[index].connections[i][3] * 2);
-                nCanvas.lineTo(360, 5 + (snakeBrains.population[index].connections[i][1] - snakeBrains.population[index].ins + 1) * (400 / (4 + snakeBrains.population[index].outs)));
-                nCanvas.stroke();
-            } else {
-                nCanvas.moveTo(30, 5 + (snakeBrains.population[index].connections[i][0] + 1) * (400 / (4 + snakeBrains.population[index].ins)));
-                nCanvas.lineTo(360, 5 + (snakeBrains.population[index].connections[i][1] - snakeBrains.population[index].ins + 1) * (400 / (4 + snakeBrains.population[index].outs)));
-                nCanvas.stroke();
+    document.getElementById("network").remove();
+    for (let i = 0; i < points.length; i++) {
+        for (let j = 0; j < pop.population.length; j++) {
+            let output = pop.population[j].getOutput([points[i].x, points[i].y])
+            let result = output[0] > output[1];
+            if (result == points[i].type) {
+                pop.population[j].fitness++;
             }
         }
     }
+    pop.cullAndBreed();
+    document.getElementById("networkContainer").appendChild(document.createElement("canvas")).id = "network";
+    document.getElementById("network").width = "400";
+    document.getElementById("network").height = "400";
+    drawNetwork(pop.population[pop.bestIndex]);
+    console.log(pop.population[pop.bestIndex]);
+    ctx.fillStyle = "rgba(0,0,0,1)";
+    ctx.fillRect(0, 0, 400, 400);
+    for (let i = 0; i < 400; i++) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(i, lineFunc(i), 2, 2);
+    }
+
+    for (let i = 0; i < points.length; i++) {
+        let output = pop.population[pop.bestIndex].getOutput([points[i].x, points[i].y])
+        let result = output[0] > output[1];
+        if (result == points[i].type) {
+            ctx.fillStyle = points[i].type ? "green" : "blue";
+        } else {
+            ctx.fillStyle = "red";
+        }
+        ctx.fillRect(points[i].x, points[i].y, 2, 2);
+    }
 }
+
+//setInterval(advanceGeneration, 1000);
